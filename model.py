@@ -1,23 +1,32 @@
-from pymc3 import *
+from pymc import Bernoulli, Beta, deterministic, MCMC, Deterministic
 import numpy as np
-import theano.tensor as T 
 
-def estimate_failures(observed_labels, samples=100000, alpha_p=1, beta_p=1, alpha_e=1, beta_e=10, burn=100, init = {}):
-  S,N = observed_labels.shape
-  models = {}
-  with Model() as models[0]:
-    p = Beta('p', alpha=alpha_p, beta=beta_p, observed=0.3) #prior on true label
-    l = Bernoulli('l', p=p, shape=S) #true label
-    e_pos = Beta('e_pos', alpha_e, beta_e, shape=N) # error rate if label = 1
-    e_neg = Beta('e_neg', alpha_e, beta_e, shape=N) # error rate if label = 0
-    r = Deterministic('r',T.outer(1-l,e_neg)  + T.outer(l, 1-e_pos))  # P(noisy_label = 1) = e_neg if l == 0; 1-e_pos if l == 1
-    noisy_label = Bernoulli('noisy_label', p = r, shape=(S,N), observed=observed_labels)
 
-    start=find_MAP()
-    for k,v in init.items():
-      start[k] = v
-    #print start
-    step = Metropolis()
-    trace = sample(draws=samples, step=step, progressbar=True)
 
-  return models, trace
+def estimate_failures(samples, #samples from noisy labelers
+                      n_samples=10000, #number of samples to run MCMC for
+                      burn=None, #burn-in. Defaults to n_samples/2
+                      thin=10, #thinning rate. Sample every k samples from markov chain 
+                      alpha_p=1, beta_p=1, #beta parameters for true positive rate
+                      alpha_e=1, beta_e=10 #beta parameters for noise rates
+                      ):
+
+  if burn is None:
+    burn = n_samples / 2
+
+  S,N = samples.shape
+  p = Beta('p', alpha=alpha_p, beta=beta_p) #prior on true label
+  l = Bernoulli('l', p=p, size=S)
+  e_pos = Beta('e_pos', alpha_e, beta_e, size=N) # error rate if label = 1
+  e_neg = Beta('e_neg', alpha_e, beta_e, size=N) # error rate if label = 0
+
+  @deterministic(plot=False)
+  def noise_rate(l=l, e_pos=e_pos, e_neg=e_neg):
+    #probability that a noisy labeler puts a label 1
+    return np.outer(l, 1-e_pos) + np.outer(1-l, e_neg)
+
+  noisy_label = Bernoulli('noisy_label', p=noise_rate, size=samples.shape, value=samples, observed=True)
+  variables = [l, e_pos, e_neg, p, noisy_label, noise_rate]
+  model = MCMC(variables, verbose=3)
+  model.sample(iter=n_samples, burn=burn, thin=thin)
+  return model
