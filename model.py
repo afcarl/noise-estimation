@@ -5,11 +5,6 @@ import itertools
 
 
 
-# p(noisy-label = 1)
-def p_pos(l, e_pos, e_neg):
-    ret = np.outer(l, 1-e_pos) + np.outer(1-l, e_neg)
-    return ret
-
 def estimate_failures(samples, #samples from noisy labelers
                       n_samples=10000, #number of samples to run MCMC for
                       burn=None, #burn-in. Defaults to n_samples/2
@@ -29,20 +24,9 @@ def estimate_failures(samples, #samples from noisy labelers
 
   @deterministic(plot=False)
   def noise_rate(l=l, e_pos=e_pos, e_neg=e_neg):
+    #probability that a noisy labeler puts a label 1
     return np.outer(l, 1-e_pos) + np.outer(1-l, e_neg)
-  #noise_rate = Deterministic(eval = p_pos,
-  #                          name = 'noise rate',
-  #                          parents = {'l': l,
-  #                                     'e_pos': e_pos,
-  #                                     'e_neg': e_neg},
-  #                          trace = True,
-  #                          doc='',
-  #                          verbose = 0,
-  #                          dtype=float,
-  #                          plot=False,
-  #                          cache_depth = 2)
 
-  #noisy label
   noisy_label = Bernoulli('noisy_label', p=noise_rate, size=samples.shape, value=samples, observed=True)
   variables = [l, e_pos, e_neg, p, noisy_label, noise_rate]
   model = MCMC(variables, verbose=3)
