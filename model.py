@@ -29,4 +29,8 @@ def estimate_failures(samples, #samples from noisy labelers
   variables = [l, e_pos, e_neg, p, noisy_label, noise_rate]
   model = MCMC(variables, verbose=3)
   model.sample(iter=n_samples, burn=burn, thin=thin)
-  return model
+  model.write_csv('out.csv', ['p', 'e_pos', 'e_neg'])
+  p = np.median(model.trace('p')[:])
+  e_pos = np.median(model.trace('e_pos')[:],0)
+  e_neg = np.median(model.trace('e_neg')[:],0)
+  return p, e_pos, e_neg
