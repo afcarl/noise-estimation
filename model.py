@@ -3,9 +3,6 @@ import numpy as np
 import cPickle as pickle
 import itertools
 
-def flatten(l):
-    return list(itertools.chain.from_iterable(l))
-            
 # p(noisy-label = 1)
 def p_pos(l, e_pos, e_neg):
     if l == 1:
@@ -39,7 +36,7 @@ def estimate_failures(samples, n_samples, burn=0, thin=10, alpha_p=1, beta_p=1, 
   
   #noisy label
   noisy_label = np.array([[
-    Bernoulli('f_'+str(i)+','+str(j), p = rate[i,j], value=samples[i,j]) for j in xrange(N)] for i in xrange(S)],
+    Bernoulli('f_'+str(i)+','+str(j), p = rate[i,j], value=samples[i,j], observed=True) for j in xrange(N)] for i in xrange(S)],
       dtype=object) 
 
   variables = l + e_pos +e_neg + [p, Container(rate), Container(noisy_label)]
