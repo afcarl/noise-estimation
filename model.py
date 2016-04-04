@@ -1,47 +1,50 @@
-from pymc import Bernoulli, Beta, deterministic, MCMC, Deterministic, Container
+from pymc import Bernoulli, Beta, deterministic, MCMC, Deterministic, Container, ScipyDistributions
 import numpy as np
 import cPickle as pickle
 import itertools
 
+
+
 # p(noisy-label = 1)
 def p_pos(l, e_pos, e_neg):
-    if l == 1:
-        return 1-e_pos #don't make a mistake 
-    else:
-        return e_neg   #make a mistake
+    ret = np.outer(l, 1-e_pos) + np.outer(1-l, e_neg)
+    return ret
 
+def estimate_failures(samples, #samples from noisy labelers
+                      n_samples=10000, #number of samples to run MCMC for
+                      burn=None, #burn-in. Defaults to n_samples/2
+                      thin=10, #thinning rate. Sample every k samples from markov chain 
+                      alpha_p=1, beta_p=1, #beta parameters for true positive rate
+                      alpha_e=1, beta_e=10 #beta parameters for noise rates
+                      ):
 
-def estimate_failures(samples, n_samples, burn=0, thin=10, alpha_p=1, beta_p=1, alpha_e=1, beta_e=10):
+  if burn is None:
+    burn = n_samples / 2
+
   S,N = samples.shape
   p = Beta('p', alpha=alpha_p, beta=beta_p) #prior on true label
-  l = [Bernoulli('l_'+str(i), p=p) for i in xrange(S)] #true label
-  e_pos = [Beta('e_pos'+str(j), alpha_e, beta_e) for j in xrange(N)] # error rate if label = 1
-  e_neg = [Beta('e_neg'+str(j), alpha_e, beta_e) for j in xrange(N)] # error rate if label = 0
+  l = Bernoulli('l', p=p, size=S)
+  e_pos = Beta('e_pos', alpha_e, beta_e, size=N) # error rate if label = 1
+  e_neg = Beta('e_neg', alpha_e, beta_e, size=N) # error rate if label = 0
 
-  rate = np.empty((S,N), dtype=object)
-  for i in xrange(S):
-      for j in xrange(N):
-          rate[i,j] = Deterministic(eval = p_pos,
-                                    name = 'p_pos_'+str(i)+'m'+str(j),
-                                    parents = {'l': l[i],
-                                               'e_pos': e_pos[j],
-                                               'e_neg': e_neg[j]},
-                                    trace = True,
-                                    doc='',
-                                    verbose = 0,
-                                    dtype=float,
-                                    plot=False,
-                                    cache_depth = 2)
+  @deterministic(plot=False)
+  def noise_rate(l=l, e_pos=e_pos, e_neg=e_neg):
+    return np.outer(l, 1-e_pos) + np.outer(1-l, e_neg)
+  #noise_rate = Deterministic(eval = p_pos,
+  #                          name = 'noise rate',
+  #                          parents = {'l': l,
+  #                                     'e_pos': e_pos,
+  #                                     'e_neg': e_neg},
+  #                          trace = True,
+  #                          doc='',
+  #                          verbose = 0,
+  #                          dtype=float,
+  #                          plot=False,
+  #                          cache_depth = 2)
 
-  
   #noisy label
-  noisy_label = np.array([[
-    Bernoulli('f_'+str(i)+','+str(j), p = rate[i,j], value=samples[i,j], observed=True) for j in xrange(N)] for i in xrange(S)],
-      dtype=object) 
-
-  variables = l + e_pos +e_neg + [p, Container(rate), Container(noisy_label)]
-  model = MCMC(variables)
+  noisy_label = Bernoulli('noisy_label', p=noise_rate, size=samples.shape, value=samples, observed=True)
+  variables = [l, e_pos, e_neg, p, noisy_label, noise_rate]
+  model = MCMC(variables, verbose=3)
   model.sample(iter=n_samples, burn=burn, thin=thin)
-  
-  model.write_csv("out.csv", variables=['p']+["e_pos"+str(j) for j in xrange(N)]+["e_neg"+str(j) for j in xrange(N)])
   return model

@@ -5,12 +5,12 @@ from pymc.Matplot import plot
 
 p = 0.3 #probability of true label being 1
 K = 3 #number of noisy classifiers
-train_samples=1000
-generate_samples=10000
-burn=1000
+train_samples= 100
+generate_samples= 50000
+burn= 500
 
-noisy_label_rates_p = np.array([0.1, 0.1, 0.1])
-noisy_label_rates_n = np.array([0.1, 0.1, 0.1])
+noisy_label_rates_p = np.array([0.1, 0.2, 0.3])
+noisy_label_rates_n = np.array([0.2, 0.2, 0.1])
 
 samples = []
 true_labels = []
@@ -26,4 +26,5 @@ for _ in xrange(train_samples):
   true_labels.append(true_label)
 
 model = estimate_failures(samples=np.vstack(samples), n_samples=generate_samples, burn=burn)
-plot(model.trace('p'))
+plot(model)
+plt.show()
