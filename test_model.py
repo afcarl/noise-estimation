@@ -24,9 +24,15 @@ for _ in xrange(train_samples):
     noisy_label = np.array(np.random.rand(K) < noisy_label_rates_n, dtype=int)
   samples.append(noisy_label)
   true_labels.append(true_label)
-
 samples = np.vstack(samples)
+
+counts = np.zeros((2,)*K)
+for s in samples:
+  counts[tuple(s)] += 1
+
 print 'true values'
 print p, noisy_label_rates_p, noisy_label_rates_n
-print 'graphical model', model.estimate_failures(samples=samples, n_samples=generate_samples)
-print 'tensor', tensor_decomp.estimate_failures(samples=samples)
+print model.estimate_failures_from_counts(counts=counts, n_samples=generate_samples)
+print model.estimate_failures(samples=samples, n_samples=generate_samples)
+print tensor_decomp.estimate_failures(samples=samples)
+print tensor_decomp.estimate_failures_from_counts(counts=counts)

@@ -87,10 +87,10 @@ def estimate_failures(samples):
   for s in samples:
     P[tuple(s)] += 1
 
-  return estimate_failures_from_tensor(P)
+  return estimate_failures_from_counts(P)
 
-def estimate_failures_from_tensor(P):
-  prior, failures, noise = learnParams_decompose(P, fix_values=1)
+def estimate_failures_from_counts(counts):
+  prior, failures, noise = learnParams_decompose(counts, fix_values=1)
   err_pos = [f*n for f,n in zip(failures, noise)]
   err_neg = [1-n for n in noise]
 
